@@ -1,0 +1,308 @@
+{
+  "name": "LAB5_2",
+  "nodes": [
+    {
+      "parameters": {
+        "jsCode": "const rows = $input.all().map(i => i.json);\n\nlet totalSales = 0;\nlet productMap = {};\nlet employeeMap = {};\n\nrows.forEach(r => {\n  const amount = r.price * r.quantity;\n  totalSales += amount;\n\n  // นับยอดตามสินค้า\n  if (!productMap[r.product_name]) productMap[r.product_name] = 0;\n  productMap[r.product_name] += amount;\n\n  // นับยอดตามพนักงาน\n  if (!employeeMap[r.employee_name]) employeeMap[r.employee_name] = 0;\n  employeeMap[r.employee_name] += amount;\n});\n\n// หาสินค้าขายดี\nlet bestProduct = Object.entries(productMap).sort((a,b) => b[1]-a[1])[0] || [\"-\",0];\n\n// หาพนักงานทำยอดสูงสุด\nlet bestEmployee = Object.entries(employeeMap).sort((a,b) => b[1]-a[1])[0] || [\"-\",0];\n\nreturn [{\n  json: {\n    total_sales: totalSales.toFixed(2),\n    best_product: bestProduct[0],\n    best_product_sales: bestProduct[1].toFixed(2),\n    best_employee: bestEmployee[0],\n    best_employee_sales: bestEmployee[1].toFixed(2),\n    rows\n  }\n}];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        360,
+        0
+      ],
+      "id": "e3f82441-fd78-4d6d-8a08-0e2bbb4f5e43",
+      "name": "Process Sales Data"
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "=คุณเป็นผู้ช่วยวิเคราะห์ยอดขาย กรุณาเขียนรายงานสรุป:\n- ยอดขายรวม {{ $json.total_sales }} บาท\n- สินค้าขายดีที่สุดคือ {{ $json.best_product }} ({{ $json.best_product_sales }} บาท)\n- พนักงานที่ทำยอดได้สูงสุดคือ {{ $json.best_employee }} ({{ $json.best_employee_sales }} บาท)\n\nเขียนรายงานให้สวยงาม เหมาะสมสำหรับผู้บริหาร",
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "typeVersion": 2,
+      "position": [
+        560,
+        0
+      ],
+      "id": "3f69e68d-10d7-45ad-ab06-e9c4df9b1775",
+      "name": "AI Generate Report"
+    },
+    {
+      "parameters": {
+        "model": "openai/gpt-3.5-turbo",
+        "options": {
+          "maxTokens": 1500,
+          "temperature": 0.4
+        }
+      },
+      "type": "@n8n/n8n-nodes-langchain.lmChatOpenRouter",
+      "typeVersion": 1,
+      "position": [
+        540,
+        180
+      ],
+      "id": "99a99293-5cfe-4d22-9ee9-c483bea8e635",
+      "name": "OpenRouter Chat Model",
+      "credentials": {
+        "openRouterApi": {
+          "id": "VkqgKRV78bJ2hGOA",
+          "name": "OpenRouter account 2"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const today = new Date();\nconst day = String(today.getDate()).padStart(2,'0');\nconst month = String(today.getMonth()+1).padStart(2,'0');\nconst year = today.getFullYear();\nconst fileName = `${day}-${month}-${year}.docx`;\n\nconst aiOutput = $input.first().json.output || $input.first().json.response || $input.first().json.text || \"รายงานว่างเปล่า\";\n\nreturn [{\n  json: {\n    fileName,\n    content: aiOutput\n  }\n}];\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        840,
+        0
+      ],
+      "id": "a8d8ad68-9bdd-425d-bc12-5e38557d641f",
+      "name": "Prepare DOCX"
+    },
+    {
+      "parameters": {
+        "folderId": "1aVtMw7fAI06KHWvlmh-jxoy-42dpGyjT",
+        "title": "={{ $json.fileName }}"
+      },
+      "type": "n8n-nodes-base.googleDocs",
+      "typeVersion": 2,
+      "position": [
+        1040,
+        0
+      ],
+      "id": "179071ef-7c83-431f-8db4-d6d2f8893aec",
+      "name": "Create Report to Daily",
+      "credentials": {
+        "googleDocsOAuth2Api": {
+          "id": "sfXjJeW7miADYriY",
+          "name": "Google Docs account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "update",
+        "documentURL": "={{ $json.id }}",
+        "actionsUi": {
+          "actionFields": [
+            {
+              "action": "insert",
+              "text": "={{ $('Prepare DOCX').item.json.content }}"
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.googleDocs",
+      "typeVersion": 2,
+      "position": [
+        1420,
+        0
+      ],
+      "id": "de2cef48-b138-4511-a2f1-5a8672b81310",
+      "name": "Data Report",
+      "credentials": {
+        "googleDocsOAuth2Api": {
+          "id": "sfXjJeW7miADYriY",
+          "name": "Google Docs account"
+        }
+      }
+    },
+    {
+      "parameters": {},
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [
+        0,
+        0
+      ],
+      "id": "433281b9-79df-4115-8119-378e62837399",
+      "name": "When clicking ‘Execute workflow’"
+    },
+    {
+      "parameters": {
+        "operation": "move",
+        "fileId": {
+          "__rl": true,
+          "value": "={{ $json.id }}",
+          "mode": "id"
+        },
+        "driveId": {
+          "__rl": true,
+          "mode": "list",
+          "value": "My Drive"
+        },
+        "folderId": {
+          "__rl": true,
+          "value": "1RUjhfWS6uxsWr_6HqE4Nl9HGaeW7-MvK",
+          "mode": "list",
+          "cachedResultName": "daily report",
+          "cachedResultUrl": "https://drive.google.com/drive/folders/1RUjhfWS6uxsWr_6HqE4Nl9HGaeW7-MvK"
+        }
+      },
+      "type": "n8n-nodes-base.googleDrive",
+      "typeVersion": 3,
+      "position": [
+        1240,
+        0
+      ],
+      "id": "8f499884-f1c6-42b5-ae7f-4f954014f022",
+      "name": "Move file",
+      "credentials": {
+        "googleDriveOAuth2Api": {
+          "id": "1PuiXFyfVyIP4Dru",
+          "name": "Google Drive account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "CREATE TABLE sales (\n    id INT AUTO_INCREMENT PRIMARY KEY,\n    employee_name VARCHAR(255) NOT NULL,\n    product_name VARCHAR(255) NOT NULL,\n    price DECIMAL(10,2) NOT NULL,\n    quantity INT NOT NULL,\n    sale_date DATE NOT NULL DEFAULT (CURRENT_DATE)\n);",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.mySql",
+      "typeVersion": 2.4,
+      "position": [
+        760,
+        -300
+      ],
+      "id": "ed15f38d-885c-43ec-94e6-2e8749580195",
+      "name": "MySQL",
+      "credentials": {
+        "mySql": {
+          "id": "EY8SxwgUt9j10kgk",
+          "name": "MySQL account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "SELECT employee_name, product_name, price, quantity, sale_date FROM sales WHERE sale_date = CURRENT_DATE;",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.mySql",
+      "typeVersion": 2.4,
+      "position": [
+        180,
+        0
+      ],
+      "id": "ca635fea-9a56-450e-868c-c73de10f79dc",
+      "name": "MySQL1",
+      "credentials": {
+        "mySql": {
+          "id": "EY8SxwgUt9j10kgk",
+          "name": "MySQL account"
+        }
+      }
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Process Sales Data": {
+      "main": [
+        [
+          {
+            "node": "AI Generate Report",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "OpenRouter Chat Model": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "AI Generate Report",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "AI Generate Report": {
+      "main": [
+        [
+          {
+            "node": "Prepare DOCX",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Prepare DOCX": {
+      "main": [
+        [
+          {
+            "node": "Create Report to Daily",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Create Report to Daily": {
+      "main": [
+        [
+          {
+            "node": "Move file",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Move file": {
+      "main": [
+        [
+          {
+            "node": "Data Report",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "When clicking ‘Execute workflow’": {
+      "main": [
+        [
+          {
+            "node": "MySQL1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "MySQL1": {
+      "main": [
+        [
+          {
+            "node": "Process Sales Data",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "versionId": "e7ee8736-6aa1-431f-bfe5-9fd3474a2618",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "3ffe81eeecacc0ac8568bdf22d751da788df336c117cf55bde0e9089433631e5"
+  },
+  "id": "6CGnuks828f8h3wn",
+  "tags": []
+}
